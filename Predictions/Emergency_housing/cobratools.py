@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -60,6 +61,112 @@ class Analysis():
             print(self.df.skew())
             self.printer.title("Kurtosis")
             print(self.df.kurtosis())
+
+
+    def get_col_uniques(self, col, dropna=True):
+        """
+        Returns the set of unique values for the given column
+        """
+        if dropna:
+            return self.df[col].dropna().unique()
+        else:
+            return self.df[col].unique()
+
+    
+    def get_cols_type(self):
+        """
+        Detect features' category
+        - date
+        - num
+        - bool
+        - cat_few
+        - cat_med
+        - cat_many
+        - (not_recognized)
+        - (empty)
+
+        input: df with columns of a single type (can still have NaNs)
+
+        output: list containing the type for each feature
+        """
+        list_types = []
+
+        for feature in self.df:
+            # Retrieve unique values for the feature
+            ft_set = self.get_col_uniques(feature)
+            
+            # Numeric types / bool
+            if isinstance(ft_set[0], (np.integer, np.float)):
+                if len(ft_set) == 1:
+                    list_types.append('empty')
+                elif len(ft_set) == 2:
+                    list_types.append('bool')
+                else:
+                    list_types.append('num')
+                # if isinstance(ft_set[0], (bool, np.bool_)):
+                #     list_types.append('bool')
+            else:
+
+                try:
+                    # Date type
+                    isinstance(pd.to_datetime(ft_set[0]), pd.datetime)
+                    list_types.append('date')
+                except:
+                    if isinstance(ft_set[0], str):
+                        if len(ft_set) == 1:
+                            list_types.append('empty')
+                        elif len(ft_set) == 2:
+                            list_types.append('bool')
+                        elif len(ft_set) <= 10:
+                            list_types.append('cat_few')
+                        elif len(ft_set) <= 30:
+                            list_types.append('cat_med')
+                        else:
+                            list_types.append('cat_many')
+                    else:
+                        list_types.append('not_recognized')
+        
+        return list_types
+
+    def preprocess_all(self, true_val='t', false_val='f'):
+        """
+        Preprocess all columns
+
+        - bools: replace string 't' 'f' by True False equivalents
+        - cat_few: replace strings by one-hot encodings
+
+        Other types are left to manual preprocessing
+
+        Ps: Apply only if database is congruent (always the same strings
+        are used for true/false)
+        """
+        # Preprocess booleans
+        for col, col_type in zip(self.df, self.get_cols_type()):
+            if col_type == 'bool':
+                self.preprocess_col_bool(col=col, true_val=true_val, false_val=false_val)
+            elif col_type == 'cat_few':
+                self.preprocess_col_cat(col=col)
+
+
+    def preprocess_col_bool(self, col, true_val='t', false_val='f'):
+        """
+        Replace all boolean values of a column by True and False
+        
+        Ps: inplace operation
+        """
+        self.df.replace(true_val, int(1), inplace=True)
+        self.df.replace(false_val, int(0), inplace=True)
+
+
+    def preprocess_col_cat(self, col):
+        """
+        Replace col categories by one-hot-encodings
+        
+        Ps: inplace operation
+        """
+        df_dummies = pd.get_dummies(self.df[col], prefix=col+'_cat')
+        self.df = pd.concat([self.df, df_dummies], axis=1)
+        self.df.drop([col], axis=1, inplace=True)
 
 
     def visualize(self, investigation_level=1, subplot_n_cols_limit=3, barplot_n_classes_limit=10):
