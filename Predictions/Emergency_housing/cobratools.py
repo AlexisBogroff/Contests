@@ -31,6 +31,7 @@ class Analysis():
     """
     def __init__(self, df):
         self.df = df
+        self.target = None
         self.printer = PrinterStyle()
 
     def describe(self, investigation_level=2):
@@ -65,6 +66,21 @@ class Analysis():
     def export_data(self, file_name='data.csv'):
         """ Export data to csv file """
         self.df.to_csv(file_name, index=False, index_label=False)
+
+
+    def get_na_counts(self):
+        """
+        Returns the number of NAs for each feature 
+        Returns only if NA count > 0
+        - by feature
+        - by sample
+        """
+        mask_na = self.df.isna()
+        na_ft = mask_na.sum(axis=0)
+        na_sp = mask_na.sum(axis=1)
+        #na_ft[na_ft!=0], na_sp[na_sp!=0]
+
+        return na_ft, na_sp
 
 
     def get_col_uniques(self, col, dropna=True):
@@ -130,7 +146,7 @@ class Analysis():
         return list_types
 
 
-    def preprocess_all(self, true_val='t', false_val='f'):
+    def transform_categories(self, true_val='true', false_val='false'):
         """
         Preprocess all columns
 
@@ -141,32 +157,113 @@ class Analysis():
 
         Ps: Apply only if database is congruent (always the same strings
         are used for true/false)
+
+        Return:
+        - list of columns that failed transformation*
+        - (list) mapping between true/false and old cat names*
+        * for convert_to_bool only
+
         """
-        # Preprocess booleans
+        list_failed = []
+        mapping_true_false_cols = []
+
+        # Transform each categorical column
         for col, col_type in zip(self.df, self.get_cols_type()):
+            
+            # Convert bool values with 
             if col_type == 'bool':
-                self.preprocess_col_bool(col=col, true_val=true_val, false_val=false_val)
+                mapping_col, failed = self.convert_to_bool(col=col,
+                                                true_val=true_val,
+                                                false_val=false_val)
+
+                mapping_true_false_cols.append((mapping_col))
+
+                if failed:
+                    list_failed.append(col)
+            
+            # Tranform to one-hot categories
             elif col_type == 'cat_few':
-                self.preprocess_col_cat(col=col)
+                self.convert_to_onehot_enc(col=col)
+        
+        return mapping_true_false_cols, list_failed
 
 
-    def preprocess_col_bool(self, col, true_val='t', false_val='f'):
+
+    def convert_to_bool(self, col, true_val='true', false_val='false', verbose=True):
         """
-        Replace all boolean values of a column by True and False
+        Replace boolean values of a column by 1 and 0
         
         Ps: inplace operation
+
+        Return:
+        - mapping_true_false
+        - indication if failed
         """
-        self.df.replace(true_val, int(1), inplace=True)
-        self.df.replace(false_val, int(0), inplace=True)
+        recognized = False
+        uniques = self.get_col_uniques(col)
+
+        # If bool vaues not recognized, try to recognize frequent ones
+        if (not true_val in uniques) or (not false_val in uniques):
+        
+            # Force df unique values to be lower letters
+            uniques_transfo = [str(val).lower() for val in uniques]
+
+            # Frequent bool values to test
+            freq_bools = [
+                ('true', 'false'),
+                ('t', 'f'),
+                ('1', '0'),
+                ('1.0', '1.0'),
+                ('male', 'female'),
+                ('yes', 'no')
+            ]
+            # Try to recognize one of these pairs
+            for bools in freq_bools:
+
+                # If pair is recognized => assign its values to true_val/false_val
+                if bools[0] in uniques_transfo and bools[1] in uniques_transfo:
+                    
+                    # If true is in first position
+                    if bools[0] == uniques_transfo[0]:
+                        true_val = uniques[0]
+                        false_val = uniques[1]
+                    else:
+                        true_val = uniques[1]
+                        false_val = uniques[0]
+                    
+                    if verbose:
+                        print("Transform Boolean at col {}: "
+                                "True/False={}".format(col, uniques))
+                    recognized = True
+                    break
+
+            if not recognized:
+                if verbose:
+                    print("\nERROR - Transform Boolean at col {} "
+                            "not recognized: {}\n".format(col, uniques))
+                
+                return (np.nan, np.nan), True  # True means failed
+
+        # Replace (recognized) bool values
+        bools_map = {
+            true_val: int(1),
+            false_val: int(0)
+        }
+        self.df[col] = self.df[col].map(bools_map)
+        
+        # Cast new type
+        self.df[col] = self.df[col].astype('boolean')
+
+        return (true_val, false_val), False
 
 
-    def preprocess_col_cat(self, col):
+    def convert_to_onehot_enc(self, col):
         """
         Replace col (contains categories) by one-hot-encodings
         
         Ps: inplace operation
         """
-        df_dummies = pd.get_dummies(self.df[col], prefix=col+'_cat')
+        df_dummies = pd.get_dummies(self.df[col], prefix=col+'_cat', dtype='bool')
         self.df = pd.concat([self.df, df_dummies], axis=1)
         self.df.drop([col], axis=1, inplace=True)
 
