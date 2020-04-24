@@ -31,7 +31,6 @@ class Analysis():
     """
     def __init__(self, df):
         self.df = df
-        self.len = df.shape[0]
         self.printer = PrinterStyle()
 
     def describe(self, investigation_level=2):
@@ -61,6 +60,11 @@ class Analysis():
             print(self.df.skew())
             self.printer.title("Kurtosis")
             print(self.df.kurtosis())
+
+
+    def export_data(self, file_name='data.csv'):
+        """ Export data to csv file """
+        self.df.to_csv(file_name, index=False, index_label=False)
 
 
     def get_col_uniques(self, col, dropna=True):
@@ -103,10 +107,7 @@ class Analysis():
                     list_types.append('bool')
                 else:
                     list_types.append('num')
-                # if isinstance(ft_set[0], (bool, np.bool_)):
-                #     list_types.append('bool')
             else:
-
                 try:
                     # Date type
                     isinstance(pd.to_datetime(ft_set[0]), pd.datetime)
@@ -127,6 +128,7 @@ class Analysis():
                         list_types.append('not_recognized')
         
         return list_types
+
 
     def preprocess_all(self, true_val='t', false_val='f'):
         """
@@ -160,7 +162,7 @@ class Analysis():
 
     def preprocess_col_cat(self, col):
         """
-        Replace col categories by one-hot-encodings
+        Replace col (contains categories) by one-hot-encodings
         
         Ps: inplace operation
         """
