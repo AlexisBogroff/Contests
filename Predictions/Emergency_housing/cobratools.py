@@ -65,7 +65,7 @@ class Analysis():
 
     def export_data(self, file_name='data.csv'):
         """ Export data to csv file """
-        self.df.to_csv(file_name, index=False, index_label=False)
+        self.df.to_csv(file_name)
 
 
     def get_na_counts(self):
@@ -115,8 +115,12 @@ class Analysis():
             # Retrieve unique values for the feature
             ft_set = self.get_col_uniques(feature)
             
+            # Pure boolean
+            if isinstance(ft_set[0], np.bool_):
+                list_types.append('bool')
+
             # Numeric types / bool
-            if isinstance(ft_set[0], (np.integer, np.float)):
+            elif isinstance(ft_set[0], (np.integer, np.float)):
                 if len(ft_set) == 1:
                     list_types.append('empty')
                 elif len(ft_set) == 2:
@@ -146,7 +150,7 @@ class Analysis():
         return list_types
 
 
-    def transform_categories(self, true_val='true', false_val='false'):
+    def transform_categories(self, true_val='true', false_val='false', target=None):
         """
         Preprocess all columns
 
@@ -169,21 +173,24 @@ class Analysis():
 
         # Transform each categorical column
         for col, col_type in zip(self.df, self.get_cols_type()):
-            
-            # Convert bool values with 
-            if col_type == 'bool':
-                mapping_col, failed = self.convert_to_bool(col=col,
-                                                true_val=true_val,
-                                                false_val=false_val)
 
-                mapping_true_false_cols.append((mapping_col))
+            # Don't modify the target variable
+            if not col == target:
+                
+                # Convert bool values with 
+                if col_type == 'bool':
+                    mapping_col, failed = self.convert_to_bool(col=col,
+                                                    true_val=true_val,
+                                                    false_val=false_val)
 
-                if failed:
-                    list_failed.append(col)
-            
-            # Tranform to one-hot categories
-            elif col_type == 'cat_few':
-                self.convert_to_onehot_enc(col=col)
+                    mapping_true_false_cols.append((mapping_col))
+
+                    if failed:
+                        list_failed.append(col)
+                
+                # Tranform to one-hot categories
+                elif col_type == 'cat_few':
+                    self.convert_to_onehot_enc(col=col)
         
         return mapping_true_false_cols, list_failed
 
@@ -252,7 +259,7 @@ class Analysis():
         self.df[col] = self.df[col].map(bools_map)
         
         # Cast new type
-        self.df[col] = self.df[col].astype('boolean')
+        self.df[col] = self.df[col].astype(np.bool_)
 
         return (true_val, false_val), False
 
