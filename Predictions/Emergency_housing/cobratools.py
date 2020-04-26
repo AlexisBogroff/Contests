@@ -31,8 +31,14 @@ class Analysis():
     """
     def __init__(self, df):
         self.df = df
+        self.m = df.shape[0]
+        self.n = df.shape[1]
+
         self.target = None
+        self.default_na_vals = None
+        
         self.printer = PrinterStyle()
+
 
     def describe(self, investigation_level=2):
         """
@@ -148,6 +154,31 @@ class Analysis():
                         list_types.append('not_recognized')
         
         return list_types
+
+
+    def set_default_na_vals(self):
+        """
+        Define the default values to replace if no other
+        imputation method was defined for the case
+
+        TODO: implement method to define default values
+        - poor: overall average
+        - slightly better: average of a similar group
+        """
+        self.default_na_vals = self.df.dropna().iloc[0]
+
+
+    def impute_na(self):
+        """
+        Method built essentially for in-production "test" samples.
+
+        If no method was implemented to impute a given feature' value,
+        set a default value to prevent interuption.
+        Else, try to apply the methods in order of preference
+
+        TODO: use self.default_na_vals[feature]
+        """
+        raise NotImplementedError
 
 
     def transform_categories(self, true_val='true', false_val='false', target=None):
