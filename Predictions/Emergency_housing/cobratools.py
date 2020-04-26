@@ -40,7 +40,7 @@ class Analysis():
         self.printer = PrinterStyle()
 
 
-    def describe(self, investigation_level=2, header=True):
+    def describe(self, investigation_level=2, header=False):
         """
         Overview of shape, features, header and statistics
         investigation_level: int in [1, 2]
@@ -56,16 +56,19 @@ class Analysis():
         
         # Display data header
         # TODO: create a nice display
-        if investigation_level > 1:
-            self.printer.title("Header")
-            print(self.df.head())
+        if investigation_level > 0:
+            if header:
+                self.printer.title("Header")
+                print(self.df.head())
         
         # Display complementary stats
-        if investigation_level > 2:
+        if investigation_level > 1:
             self.printer.title("Correlations")
             print(self.df.corr())
             self.printer.title("Median")
             print(self.df.median())
+
+        if investigation_level > 2:
             self.printer.title("Skewness")
             print(self.df.skew())
             self.printer.title("Kurtosis")
