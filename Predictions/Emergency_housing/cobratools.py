@@ -40,10 +40,12 @@ class Analysis():
         self.printer = PrinterStyle()
 
 
-    def describe(self, investigation_level=2):
+    def describe(self, investigation_level=2, header=True):
         """
         Overview of shape, features, header and statistics
         investigation_level: int in [1, 2]
+
+        header is to display preferably for slim datasets (very few columns)
         """
         # Display shape and list features
         self.printer.title("Properties")
@@ -53,6 +55,7 @@ class Analysis():
               features=self.df.columns.values))
         
         # Display data header
+        # TODO: create a nice display
         if investigation_level > 1:
             self.printer.title("Header")
             print(self.df.head())
@@ -162,7 +165,7 @@ class Analysis():
         imputation method was defined for the case
 
         TODO: implement method to define default values
-        - poor: overall average
+        - poor: overall average based on train set average
         - slightly better: average of a similar group
         """
         self.default_na_vals = self.df.dropna().iloc[0]
