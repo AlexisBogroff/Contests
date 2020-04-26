@@ -168,6 +168,30 @@ class Analysis():
         self.default_na_vals = self.df.dropna().iloc[0]
 
 
+    def impute_child_to_come(self, df_indiv):
+        """
+        Specific method to impute child_to_come NaNs
+        > Impute child_to_come from pregnancy in the group of indiv of the request
+        """
+        # Create mask that says if pregnancy true for each REQUEST (±1min)
+        ma_child_t_c = df_indiv['pregnancy'].groupby(df_indiv['request_id']).apply(lambda x: max(x=='t'))
+
+        # Sort request_train to match with the mask
+        self.df.sort_index(inplace=True)
+
+        # Control that indexes match perfectly
+        if not sum(self.df.index != ma_child_t_c.index) == 0:
+            print("Issue in matching of indexes, will certainly corrupt data")
+
+        # Set child_to_come as True if pregnancy 't', False otherwise
+        self.df['child_to_come'] = ma_child_t_c
+
+        # Check that no NaN remains
+        if not self.df['child_to_come'].isna().sum() == 0:
+            print("NaNs remaining")
+            
+
+
     def impute_na(self):
         """
         Method built essentially for in-production "test" samples.
