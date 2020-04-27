@@ -80,7 +80,7 @@ class Analysis():
         self.df.to_csv(file_name)
 
 
-    def get_na_counts(self):
+    def get_na_counts(self, non_zero=True):
         """
         Returns the number of NAs for each feature 
         Returns only if NA count > 0
@@ -90,7 +90,10 @@ class Analysis():
         mask_na = self.df.isna()
         na_ft = mask_na.sum(axis=0)
         na_sp = mask_na.sum(axis=1)
-        #na_ft[na_ft!=0], na_sp[na_sp!=0]
+        
+        if non_zero:
+            na_ft = na_ft[na_ft!=0]
+            na_sp = na_sp[na_sp!=0]
 
         return na_ft, na_sp
 
@@ -179,7 +182,7 @@ class Analysis():
         Specific method to impute child_to_come NaNs
         > Impute child_to_come from pregnancy in the group of indiv of the request
         """
-        # Create mask that says if pregnancy true for each REQUEST (±1min)
+        # Create mask that says if pregnancy true for each REQUEST (±2min)
         ma_child_t_c = df_indiv['pregnancy'].groupby(df_indiv['request_id']).apply(lambda x: max(x=='t'))
 
         # Sort request_train to match with the mask
@@ -197,8 +200,7 @@ class Analysis():
             print("NaNs remaining")
             
 
-
-    def impute_na(self):
+    def impute_nans(self):
         """
         Method built essentially for in-production "test" samples.
 
@@ -208,7 +210,11 @@ class Analysis():
 
         TODO: use self.default_na_vals[feature]
         """
-        raise NotImplementedError
+        na,_ = self.get_na_counts(non_zero=True)
+        
+        for col in na.index:
+            mask_na_rows = self.df[col].isna()
+            self.df.loc[mask_na_rows, col] = self.default_na_vals[col]
 
 
     def transform_categories(self, true_val='true', false_val='false', target=None):
@@ -250,7 +256,7 @@ class Analysis():
                         list_failed.append(col)
                 
                 # Tranform to one-hot categories
-                elif col_type == 'cat_few':
+                elif col_type in ['cat_few', 'cat_med']:
                     self.convert_to_onehot_enc(col=col)
         
         return mapping_true_false_cols, list_failed
@@ -320,7 +326,7 @@ class Analysis():
         self.df[col] = self.df[col].map(bools_map)
         
         # Cast new type
-        self.df[col] = self.df[col].astype(np.bool_)
+        self.df[col] = self.df[col].astype(np.uint8)
 
         return (true_val, false_val), False
 
@@ -331,7 +337,7 @@ class Analysis():
         
         Ps: inplace operation
         """
-        df_dummies = pd.get_dummies(self.df[col], prefix=col+'_cat', dtype='bool')
+        df_dummies = pd.get_dummies(self.df[col], prefix=col+'_cat', dtype=np.uint8)
         self.df = pd.concat([self.df, df_dummies], axis=1)
         self.df.drop([col], axis=1, inplace=True)
 
