@@ -1,6 +1,11 @@
+# Data
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+# ML
+from torch.utils.data import Dataset, DataLoader
+from torch import nn, optim
+
 
 
 class PrinterStyle():
@@ -433,3 +438,44 @@ class Analysis():
         plt.subplots_adjust(hspace=0.15*n_rows_total, wspace=0.15*n_cols_total)
         
         return fig, axes
+
+
+class Dataset(Dataset):
+
+    # Constructor
+    def __init__(self, X, Y):
+        # Cast Y to long for CrossEntropyLoss
+        self.Y = Y.type(torch.LongTensor)
+        self.X = X
+        self.len=len(self.X)
+
+    def __len__(self):
+        return self.len
+    
+    def __getitem__(self, idx):
+        x=self.X[idx]
+        y=self.Y[idx]
+        return x, y
+
+
+
+class NN(nn.Module):
+    def __init__(self, layers, p=0):
+        super(NN, self).__init__()
+        self.hidden_layers = nn.ModuleList()
+
+        # Set seed to reproduce results
+        torch.manual_seed(1000)
+        
+        for input_size, output_size in zip(layers, layers[1:]):
+            self.hidden_layers.append(nn.Linear(input_size, output_size))
+            #self.hidden_layers.append(nn.Dropout(p=p))
+            self.hidden_layers.append(nn.BatchNorm1d(output_size))
+
+    def forward(self, activation):
+        for i_layer, linear_transform in enumerate(self.hidden_layers):
+            if i_layer < len(self.hidden_layers) - 1:
+                activation = torch.relu(linear_transform(activation))
+            else:
+                activation = linear_transform(activation)
+        return activation
