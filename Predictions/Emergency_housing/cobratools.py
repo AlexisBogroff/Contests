@@ -3,7 +3,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 # ML
+import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.nn import Linear
 from torch import nn, optim
 
 
