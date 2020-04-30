@@ -9,6 +9,29 @@ from torch.nn import Linear
 from torch import nn, optim
 
 
+# Define the test scorer
+def competition_scorer(y_true, y_pred):
+    return log_loss(y_true, y_pred, sample_weight=10**y_true)
+
+
+
+def to_one_hot(vec, max_val = .95, min_val = None, to_int=False):
+    """
+    Transform a vector into a one-hot encoded matrix
+    It enables non zero values with min_val and a different val than 1 with max_val
+    It constructs it as a distribution with its terms summing to 1 (not)
+    """
+    if to_int:
+        vec = vec.astype(np.int32)
+    min_val = (1 - max_val) / vec.max()
+    mat = np.zeros((vec.size, vec.max()+1))
+    mat += min_val
+    mat[np.arange(vec.size), vec] = max_val
+
+    if isinstance(vec, pd.core.series.Series):
+        mat = pd.DataFrame(mat, columns=range(vec.max()+1))
+    return mat
+
 
 class PrinterStyle():
     """
@@ -224,7 +247,7 @@ class Analysis():
             self.df.loc[mask_na_rows, col] = self.default_na_vals[col]
 
 
-    def transform_categories(self, true_val='true', false_val='false', target=None):
+    def transform_categories(self, true_val='true', false_val='false', target=None, verbose=False):
         """
         Preprocess all columns
 
@@ -255,7 +278,8 @@ class Analysis():
                 if col_type == 'bool':
                     mapping_col, failed = self.convert_to_bool(col=col,
                                                     true_val=true_val,
-                                                    false_val=false_val)
+                                                    false_val=false_val,
+                                                    verbose=verbose)
 
                     mapping_true_false_cols.append((mapping_col))
 
@@ -270,7 +294,7 @@ class Analysis():
 
 
 
-    def convert_to_bool(self, col, true_val='true', false_val='false', verbose=True):
+    def convert_to_bool(self, col, true_val='true', false_val='false', verbose=False):
         """
         Replace boolean values of a column by 1 and 0
         
@@ -442,12 +466,17 @@ class Analysis():
         return fig, axes
 
 
+
 class Dataset(Dataset):
 
     # Constructor
-    def __init__(self, X, Y):
+    def __init__(self, X, Y, y_long=True):
         # Cast Y to long for CrossEntropyLoss
-        self.Y = Y.type(torch.LongTensor)
+        if y_long:
+            self.Y = Y.type(torch.LongTensor)
+        else:
+            self.Y = Y.type(torch.FloatTensor)
+
         self.X = X
         self.len=len(self.X)
 
@@ -458,6 +487,7 @@ class Dataset(Dataset):
         x=self.X[idx]
         y=self.Y[idx]
         return x, y
+
 
 
 
