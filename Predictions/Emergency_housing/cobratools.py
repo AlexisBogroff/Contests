@@ -14,7 +14,6 @@ def competition_scorer(y_true, y_pred):
     return log_loss(y_true, y_pred, sample_weight=10**y_true)
 
 
-
 def to_one_hot(vec, max_val = .95, min_val = None, to_int=False):
     """
     Transform a vector into a one-hot encoded matrix
@@ -68,6 +67,54 @@ class Analysis():
         self.default_na_vals = None
         
         self.printer = PrinterStyle()
+
+
+    def create_ft_grant_ratio(self, ft='district', inplace=True):
+        """
+        Ratio that appreaciates the probability to be granted at 
+        least a night given:
+        - district: the place of the center that was requested
+        - town: the place of leaving of the individual
+        """
+        # Set feature name
+        ft_name = ft + '_grant_ratio'
+
+        # Make alias and check exists
+        if self.target:
+            target = self.target
+        else:
+            raise ValueError("Target variable has not been set. "\
+                            "Use self.target=<var_name> to set the variable")
+
+        # Number of nights granted for each ft (by request)
+        target_by_ft = self.df[[ft, target]].dropna()\
+                            .groupby(ft)[[target]].sum()\
+                            .sort_values(by=target, ascending=False)
+
+        # Number of requests by ft
+        n_rq_by_ft = self.df[ft].dropna().value_counts()
+
+        # Mapping of ft with their ratio of grant
+        df_ft = pd.merge(target_by_ft,
+                                n_rq_by_ft,
+                                left_index=True,
+                                right_index=True)
+
+        # Compute sort of proba to be granted by ft (precisely: n_nights/n_requests)
+        # where ft means number of requests
+        df_grant_ratio_ft = pd.DataFrame({ft_name: round(df_ft[target]/df_ft[ft], 2)})
+
+        # Transform dataframe to dic
+        dic = df_grant_ratio_ft.to_dict()[ft_name]
+
+        # Create a list of ratios corresponding to each sample
+        new_feat = [dic[name] for name in self.df[ft]]
+
+        if inplace:
+            # Add ft_grant_ratio to dataframe
+            self.df[ft_name] = new_feat
+        else:
+            return new_feat
 
 
     def describe(self, investigation_level=2, header=False):
