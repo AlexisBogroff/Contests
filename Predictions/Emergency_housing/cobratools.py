@@ -136,19 +136,10 @@ class Analysis():
         # Extract the original ft2-ft1 vectors
         df_ft2_ft1 = self.df[[ft2, ft1]]
 
-
         # Combine the 2 ft1 vectors into one column, keeping the first str (non NaN)
-        # ---------------------------------------------------------------------------
-
-        # func to select the non na value
-        fc_take_non_na = lambda s1, s2: s1 if isinstance(s1, str) else s2
-
-        # Drop previous self ft1 column
-        self.df.drop(ft1, inplace=True, axis=1)
-
-        # Combine the two vectors using the rule define above
-        ft1_filled = df_ft2_ft1[ft1].combine(df_matched[ft1],
-                                                   fc_take_non_na)
+        # Functions 'combine' and 'combine_first' had strange behaviors on my laptop
+        # (even though working properly on collab), hence the use of a universal solution
+        ft1_filled = [v1 if isinstance(v1, str) else v2 for v1, v2 in zip(df_ft2_ft1[ft1], df_matched[ft1])]
 
         if inplace:
             # Replace current ft1 in self.df
