@@ -2,16 +2,49 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
 # ML
+from sklearn.metrics import log_loss
 import torch
+from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
 from torch.nn import Linear
-from torch import nn, optim
 
 
-# Define the test scorer
-def competition_scorer(y_true, y_pred):
-    return log_loss(y_true, y_pred, sample_weight=10**y_true)
+def calculate_n_weights(layers):
+    """ Calculate the number of weights given the layers """
+    n_weights = 0
+    
+    for l, l_next in zip(layers[:-1], layers[1:]):
+        n_weights += (l+1)*l_next
+    
+    return n_weights
+
+
+def competition_scorer(predictions, labels):
+    """ Define the test scorer """
+    return log_loss(labels, predictions, sample_weight=10**labels)
+
+
+def compute_accuracy(predictions, labels, n_round=4):
+    """ Compute accuracy """
+    # TODO: check if shape vec or array
+    # TODO: check if type tensor or np.array
+    
+    # Get max predictions
+    predictions = predictions.argmax(axis=1)
+    
+    # Cast to numpy format
+    predictions = predictions.numpy()
+    labels = labels.numpy()
+
+    # Compute accuracy
+    accuracy = sum(predictions == labels)/len(labels)
+    
+    # Round result and x100
+    accuracy = round(accuracy * 100, n_round)
+
+    return accuracy
 
 
 def to_one_hot(vec, max_val = .95, min_val = None, to_int=False):
@@ -30,28 +63,6 @@ def to_one_hot(vec, max_val = .95, min_val = None, to_int=False):
     if isinstance(vec, pd.core.series.Series):
         mat = pd.DataFrame(mat, columns=range(vec.max()+1))
     return mat
-
-
-class PrinterStyle():
-    """
-    Contains functions to apply a custom style to pandas' print outputs
-    and functions to print with a predefined style (e.g. titles)
-    """
-    def __init__(self, n_line_jumps=2):
-        self.n_line_jumps = n_line_jumps
-
-    def title(self, str_title):
-        """
-        Print title with space and a delimiter for
-        a clear display of info
-        """
-        delimiter = "-" * len(str_title)
-        line_jumps = "\n" * self.n_line_jumps
-        print("{line_jumps}"
-            "{title}\n"
-            "{delim}"
-            "{line_jumps}"
-            .format(title=str_title, delim=delimiter, line_jumps=line_jumps))
 
 
 class Analysis():
@@ -642,6 +653,132 @@ class Dataset(Dataset):
 
 
 
+class Monitoring:
+    """
+    Class to monitor models performances
+
+    Uses external metrics functions, which must be defined
+    as follows (example):
+    
+    Example:
+    --------
+    metrics = {'accuracy': func_accuracy,
+               'loss_model': func_criterion}
+
+    TODO: include epochs and batchs handling, 
+    removing the need to create two instances,
+    removing the need to pass batch object to 
+    epoch object to compute aggregates
+    """
+    def __init__(self, sets, metrics, precision=4):
+        self.sets_names = sets
+        self.metrics_info = metrics
+        self.metrics = self._init_perf(sets, metrics)
+        self.precision = precision
+        
+        # Counters
+        self.epoch = 0
+        self.batch = 0
+
+
+    def _init_perf(self, sets=None, metrics=None):
+        """
+        Initialize a dictionnary to store multiple metrics 
+        for each type of data set
+
+        Example:
+        --------
+        perfs = {'train': {'accuracy': None,
+                        'loss': None}
+                'test':  {'accuracy': None,
+                        'loss': None}}
+        """
+        # Set default sets and metrics if not passed as input
+        if not sets:
+            sets = ['train', 'test']
+        if not metrics:
+            metrics = ['accuracy', 'loss']
+        
+        # Set default value for the metrics
+        default_val = None
+
+        # Initialize dictionaries
+        dic_perfs = {}
+        dic_metrics = {}
+
+        # Construct temp metric dic
+        for metric in metrics:
+            dic_metrics[metric] = None
+
+        # Construct perf dic
+        for set_i in sets:
+            dic_perfs[set_i] = dic_metrics
+
+        return dic_perfs
+
+
+    def evaluate(self, predictions, labels, dset='train'):
+        """ Method that calls each metric function """ 
+        
+        for metric in self.metrics_info:
+            # Retrieve metric function
+            func = self.metrics_info[metric]
+            
+            # Differentiate functions
+            if not metric is 'loss_compet':
+
+                # Call metric with generic parameters
+                score = func(predictions, labels)
+            else:
+                # Special cases
+                score = func(predictions.detach().numpy(), labels.numpy())
+
+            # Cast to numpy array type (TODO: detect type)
+            #np_predictions = torch.tensor(predictions, dtype=float).numpy()
+            #np_labels = labels.numpy()
+            
+
+            # Store result
+            self.metrics[dset][metric] = score
+
+
+    def compute(self, obj_batchs):
+        """ Only for epoch: computes the average of each dset batches """
+        # TODO: implement for other types (currently: tensors only)
+        PRECISION = 4
+
+        for set_i in obj_batchs.sets_names:
+            for metric in obj_batchs.metrics_info:
+                # Retrieve scores
+                scores = obj_batchs.metrics[set_i][metric]
+                
+                if scores:
+                    # Compute average and round
+                    score_avg = scores.mean()
+                    score_avg = round(score_avg.item(), self.precision)
+
+                    # Store score epoch
+                    self.metrics[set_i][metric] = score_avg
+
+
+
+    def display(self, metrics=None, dset='train'):
+        """ Print metrics' values """
+        # TODO: conditional print given inputs
+
+        if not metrics:
+            metrics = self.metrics_info.keys
+            
+        for metric in metrics:
+            score = self.metrics[dset][metric]
+            print(f"{metric}: {score}")
+
+
+    def reset(self):
+        """ Re-init history """
+        self.metrics = self._init_perf(self.sets_names, self.metrics_info)
+
+
 
 class NN(nn.Module):
     def __init__(self, layers, p=0):
@@ -663,3 +800,26 @@ class NN(nn.Module):
             else:
                 activation = linear_transform(activation)
         return activation
+
+
+
+class PrinterStyle():
+    """
+    Contains functions to apply a custom style to pandas' print outputs
+    and functions to print with a predefined style (e.g. titles)
+    """
+    def __init__(self, n_line_jumps=2):
+        self.n_line_jumps = n_line_jumps
+
+    def title(self, str_title):
+        """
+        Print title with space and a delimiter for
+        a clear display of info
+        """
+        delimiter = "-" * len(str_title)
+        line_jumps = "\n" * self.n_line_jumps
+        print("{line_jumps}"
+            "{title}\n"
+            "{delim}"
+            "{line_jumps}"
+            .format(title=str_title, delim=delimiter, line_jumps=line_jumps))
