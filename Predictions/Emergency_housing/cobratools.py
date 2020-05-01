@@ -110,6 +110,54 @@ class Analysis():
         self.df.to_csv(file_name)
 
 
+    def fill_na_most_freq_pair(self, ft1, ft2, mapping, inplace=False):
+        """
+        Fill a feature (ft1) with a pair feature (ft2) using a mapping
+        of most frequent pairs
+        """
+        # Mask ft1 Nans
+        ma_na = self.df[ft1].isna()
+
+        # Get ft2 corresponding to samples where ft1 is NaN
+        # (vector of the same size, that will then be merged to the dataframe)
+        ft2_na = self.df[ft2] * ma_na
+
+        # Transform dic 'dic_ft1_max' into DataFrame
+        df_ft1_max = pd.DataFrame.from_dict(mapping,
+                                            orient='index',
+                                            columns=[ft1])
+        # Name the series
+        df_ft1_max.index.name = ft2
+
+        # Match apparent ft2 values with their ft1 pair
+        df_matched = pd.merge(pd.DataFrame({ft2:ft2_na}),
+                            df_ft1_max, on=ft2, how='left')
+
+        # Extract the original ft2-ft1 vectors
+        df_ft2_ft1 = self.df[[ft2, ft1]]
+
+
+        # Combine the 2 ft1 vectors into one column, keeping the first str (non NaN)
+        # ---------------------------------------------------------------------------
+
+        # func to select the non na value
+        fc_take_non_na = lambda s1, s2: s1 if isinstance(s1, str) else s2
+
+        # Drop previous self ft1 column
+        self.df.drop(ft1, inplace=True, axis=1)
+
+        # Combine the two vectors using the rule define above
+        ft1_filled = df_ft2_ft1[ft1].combine(df_matched[ft1],
+                                                   fc_take_non_na)
+
+        if inplace:
+            # Replace current ft1 in self.df
+            self.df[ft1] = ft1_filled
+        else:
+            # Return result without replacement
+            return ft1_filled
+
+
     def get_na_counts(self, non_zero=True):
         """
         Returns the number of NAs for each feature 
@@ -193,6 +241,72 @@ class Analysis():
                         list_types.append('not_recognized')
         
         return list_types
+
+
+    def get_features_mapping(self, ft1, ft2):
+        """
+        Returns a mapping of unique pairs between two features
+        When multiple features are corresponding, it selects
+        the one with max frequency
+        """
+        # Get ft2 uniques
+        ft1_uniques = self.df[ft1].unique()
+
+        # Get frequency of ft2 for each ft1 (build multi-index df)
+        mapping = self.df[[ft1, ft2]].dropna().pivot_table(
+                                            index=[ft1,ft2], aggfunc='size')
+
+        # Dic that will contain the mapping
+        dic_ft2_max = {}
+
+        # Search the corresponding ft2 for each ft1
+        # the selected ft2 is those with max frequency
+        for ft1_i in ft1_uniques:
+            try:
+                # Get the list of ft2_i for the selected ft1_i
+                # along with their frequency count
+                df_ft1_i = mapping.loc[ft1_i, :]
+                
+                # Get the index corresponding to the ft2_i with max count
+                idx_ft2_i_max = df_ft1_i.argmax()
+                
+                # Get the ft2_i name given its idx
+                ft2_i_max = df_ft1_i.index[idx_ft2_i_max]
+                
+                # Add key ft1_i and set its correponding ft2_i
+                dic_ft2_max[ft2_i_max[0]] = ft2_i_max[1]
+            except:
+                # Elements with ft2_i==NaNs only can't be assigned a ft2_i
+                # Thus, add key along with a unique but dumb value
+                dic_ft2_max[ft1_i] = "no_pair_for_" + str(ft1_i)
+            
+        return dic_ft2_max
+
+
+    def get_data_chunck(self, df=None, iloc_start=None, iloc_end=None, chunck_size=1000):
+        """
+        Returns a slice of the dataframe
+        """
+        # Set iloc_start and iloc_end if not defined
+        if not iloc_start:
+            iloc_start = 0
+        if not iloc_end:
+            iloc_end = iloc_start + chunck_size
+
+        # If no df passed as input, return a slice of self.df
+        if df is None:
+            try:
+                return self.df.iloc[iloc_start:iloc_end]
+            except:
+                return self.df.iloc[iloc_start:]
+        
+        else:
+            # If a df is passed as input, return its slice
+            try:
+                return df.iloc[iloc_start:iloc_end]
+            except:
+                return df.iloc[iloc_start:]
+
 
 
     def set_default_na_vals(self):
