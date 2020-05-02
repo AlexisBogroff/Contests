@@ -35,8 +35,9 @@ def compute_accuracy(predictions, labels, n_round=4):
     predictions = predictions.argmax(axis=1)
     
     # Cast to numpy format
-    predictions = predictions.numpy()
-    labels = labels.numpy()
+    # Not anymore, now input is np.array
+    #predictions = predictions.numpy()
+    #labels = labels.numpy()
 
     # Compute accuracy
     accuracy = sum(predictions == labels)/len(labels)
@@ -688,90 +689,106 @@ class Monitoring:
 
         Example:
         --------
-        perfs = {'train': {'accuracy': None,
-                        'loss': None}
-                'test':  {'accuracy': None,
-                        'loss': None}}
+        perfs = {'train': {'accuracy': [],
+                        'loss': []}
+                'test':  {'accuracy': [],
+                        'loss': []}}
         """
         # Set default sets and metrics if not passed as input
         if not sets:
             sets = ['train', 'test']
         if not metrics:
             metrics = ['accuracy', 'loss']
-        
-        # Set default value for the metrics
-        default_val = None
 
-        # Initialize dictionaries
         dic_perfs = {}
-        dic_metrics = {}
-
-        # Construct temp metric dic
-        for metric in metrics:
-            dic_metrics[metric] = None
-
-        # Construct perf dic
+        
         for set_i in sets:
+            # Initialize dictionaries
+            dic_metrics = {}
+
+            # Construct the dic of metrics history
+            for metric in metrics:
+                dic_metrics[metric] = []
+
+            # Construct perf dic
+            # - a key for each dset
+            # -- each including all metric dics
             dic_perfs[set_i] = dic_metrics
 
         return dic_perfs
 
 
-    def evaluate(self, predictions, labels, dset='train'):
-        """ Method that calls each metric function """ 
-        
+    def evaluate(self, predictions, labels, set_i='train', precision=4):
+        """
+        Method that calls each metric function and store the result
+        to the corresponding set_i and metric history.
+
+        - The score stored is in format float, i.e. has not grad attached
+        - The function outputs the model score with its grad attached
+        """
+        # Evaluate each metric
         for metric in self.metrics_info:
+
             # Retrieve metric function
             func = self.metrics_info[metric]
             
-            # Differentiate functions
-            if not metric is 'loss_compet':
+            # Functions that work np.arrays
+            if metric in ['accuracy', 'loss_compet']:
+
+                # Compute score with casting tensors to numpy arrays
+                np_score = func(predictions.detach().numpy(), labels.numpy())
+            else:
+                # Below functions need tensors+grad
 
                 # Call metric with generic parameters
-                score = func(predictions, labels)
-            else:
-                # Special cases
-                score = func(predictions.detach().numpy(), labels.numpy())
+                grad_score = func(predictions, labels)
 
-            # Cast to numpy array type (TODO: detect type)
-            #np_predictions = torch.tensor(predictions, dtype=float).numpy()
-            #np_labels = labels.numpy()
-            
+                # Cast a copy to store in numpy
+                np_score = grad_score.detach().numpy().item()
 
-            # Store result
-            self.metrics[dset][metric] = score
+            # Round score
+            np_score = round(np_score, precision)
+
+            # Add the result to the history
+            self.metrics[set_i][metric].append(np_score)
+
+        # After all metrics evaluated, return model score
+        if 'loss_model' in self.metrics_info:
+            return grad_score
 
 
-    def compute(self, obj_batchs):
-        """ Only for epoch: computes the average of each dset batches """
-        # TODO: implement for other types (currently: tensors only)
-        PRECISION = 4
+    def compute(self, obj_batchs, sets, precision=4):
+        """ Only for epoch: computes the average of each set_i batches """
+        # TODO: implement for other types
 
-        for set_i in obj_batchs.sets_names:
+        for set_i in sets:
             for metric in obj_batchs.metrics_info:
+                
                 # Retrieve scores
                 scores = obj_batchs.metrics[set_i][metric]
                 
                 if scores:
                     # Compute average and round
-                    score_avg = scores.mean()
-                    score_avg = round(score_avg.item(), self.precision)
+                    score_avg = np.array(scores).mean()
 
-                    # Store score epoch
-                    self.metrics[set_i][metric] = score_avg
+                    score_avg = round(score_avg, self.precision)
+
+                    # Add score to the history
+                    self.metrics[set_i][metric].append(score_avg)
 
 
 
-    def display(self, metrics=None, dset='train'):
+    def print_scores(self, metrics=None, i_epoch=None):
         """ Print metrics' values """
         # TODO: conditional print given inputs
 
-        if not metrics:
-            metrics = self.metrics_info.keys
-            
-        for metric in metrics:
-            score = self.metrics[dset][metric]
-            print(f"{metric}: {score}")
+        print(f"Epoch {i_epoch} (train/eval): "\
+            f"mod_loss ({self.metrics['train']['loss_model'][-1]}, "\
+                f"{self.metrics['eval']['loss_model'][-1]}), "\
+            f"comp_loss ({self.metrics['train']['loss_compet'][-1]}, "\
+                f"{self.metrics['eval']['loss_compet'][-1]}), "\
+            f"acc ({self.metrics['train']['accuracy'][-1]}, "\
+                f"{self.metrics['eval']['accuracy'][-1]})")
 
 
     def reset(self):
