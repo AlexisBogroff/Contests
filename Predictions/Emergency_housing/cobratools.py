@@ -737,7 +737,7 @@ class Monitoring:
             if metric in ['accuracy', 'loss_compet']:
 
                 # Compute score with casting tensors to numpy arrays
-                np_score = func(F.softmax(predictions).detach().numpy(), labels.numpy())
+                np_score = func(F.softmax(predictions, dim=1).detach().numpy(), labels.numpy())
             else:
                 # Below functions need tensors+grad
 
@@ -799,7 +799,7 @@ class Monitoring:
             print(f"Epoch {i_epoch} test: "\
                 f"mod_loss {self.metrics['test']['loss_model'][-1]}, "\
                 f"comp_loss {self.metrics['test']['loss_compet'][-1]}, "\
-                f"acc {self.metrics['test']['accuracy'][-1]})
+                f"acc {self.metrics['test']['accuracy'][-1]}")
 
 
     def reset(self):
@@ -809,12 +809,12 @@ class Monitoring:
 
 
 class NN(nn.Module):
-    def __init__(self, layers, p=0):
+    def __init__(self, layers, p=0, seed=500):
         super(NN, self).__init__()
         self.hidden_layers = nn.ModuleList()
 
         # Set seed to reproduce results
-        torch.manual_seed(1000)
+        torch.manual_seed(seed)
         
         for input_size, output_size in zip(layers, layers[1:]):
             self.hidden_layers.append(nn.Linear(input_size, output_size))
