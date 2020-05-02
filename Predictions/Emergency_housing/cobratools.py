@@ -130,6 +130,49 @@ class Analysis():
             return new_feat
 
 
+    def create_ft_group_age_bounds(self, obj_full_data, inplace=True):
+        """
+        Create 2 features: group age min and max
+        based on birth_year of each individual in the group
+
+        obj_full_data: the dataframe containing all samples
+        both from requests and individuals data sets
+        """
+        # Set current year
+        year_curr = pd.datetime.now().year
+
+        # Compute age for each sample from birth_year
+        s_age = year_curr - obj_full_data.df['birth_year']
+
+        # Add the index to the series, and transform it as df
+        df_age = pd.DataFrame(s_age).set_index(obj_full_data.df.request_id)
+
+        # Compute max age by request_id
+        max_age = df_age.groupby('request_id').max()
+        min_age = df_age.groupby('request_id').min()
+
+        # Merge min and max age dfs
+        df_age_merged = pd.merge(max_age,
+                                min_age,
+                                left_index=True,
+                                right_index=True)
+
+        # Rename columns
+        df_age_merged.columns = ['age_max', 'age_min']
+
+        # Merge with obj_train.df or obj_test.df
+        merged_df = pd.merge(self.df,
+                                df_age_merged,
+                                left_index=True,
+                                right_index=True)
+        
+        # Replace the merged df by current one or return it
+        if inplace:
+            self.df = merged_df
+        else:
+            return merged_df
+
+
     def describe(self, investigation_level=2, header=False):
         """
         Overview of shape, features, header and statistics
