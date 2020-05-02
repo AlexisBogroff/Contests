@@ -8,6 +8,7 @@ from sklearn.metrics import log_loss
 import torch
 from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
+from torch.nn import functional as F
 from torch.nn import Linear
 
 
@@ -736,7 +737,7 @@ class Monitoring:
             if metric in ['accuracy', 'loss_compet']:
 
                 # Compute score with casting tensors to numpy arrays
-                np_score = func(predictions.detach().numpy(), labels.numpy())
+                np_score = func(F.softmax(predictions).detach().numpy(), labels.numpy())
             else:
                 # Below functions need tensors+grad
 
@@ -778,17 +779,27 @@ class Monitoring:
 
 
 
-    def print_scores(self, metrics=None, i_epoch=None):
+    def print_scores(self, metrics=None, i_epoch=None, sets=None):
         """ Print metrics' values """
         # TODO: conditional print given inputs
 
-        print(f"Epoch {i_epoch} (train/eval): "\
-            f"mod_loss ({self.metrics['train']['loss_model'][-1]}, "\
-                f"{self.metrics['eval']['loss_model'][-1]}), "\
-            f"comp_loss ({self.metrics['train']['loss_compet'][-1]}, "\
-                f"{self.metrics['eval']['loss_compet'][-1]}), "\
-            f"acc ({self.metrics['train']['accuracy'][-1]}, "\
-                f"{self.metrics['eval']['accuracy'][-1]})")
+        if not sets:
+            sets = self.sets_names
+        
+        if 'train' in sets:
+            print(f"Epoch {i_epoch} train/val: "\
+                f"mod_loss {self.metrics['train']['loss_model'][-1]}, "\
+                    f"{self.metrics['eval']['loss_model'][-1]}, "\
+                f"comp_loss {self.metrics['train']['loss_compet'][-1]}, "\
+                    f"{self.metrics['eval']['loss_compet'][-1]}, "\
+                f"acc {self.metrics['train']['accuracy'][-1]}, "\
+                    f"{self.metrics['eval']['accuracy'][-1]}")
+        
+        if 'test' in sets:
+            print(f"Epoch {i_epoch} test: "\
+                f"mod_loss {self.metrics['test']['loss_model'][-1]}, "\
+                f"comp_loss {self.metrics['test']['loss_compet'][-1]}, "\
+                f"acc {self.metrics['test']['accuracy'][-1]})
 
 
     def reset(self):
