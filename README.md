@@ -1,1 +1,1 @@
-# Code developped to participate in competitions
+## Code developped to participate in competitions
