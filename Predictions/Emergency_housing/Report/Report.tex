@@ -1,0 +1,322 @@
+\documentclass[11pt]{article}
+\usepackage[autostyle]{csquotes}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{anysize}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{lscape}
+\usepackage{float}
+\linespread{1}
+\usepackage{hyperref}
+%\usepackage{dsfont}
+\setlength{\parindent}{0pt}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{color}
+\marginsize{30mm}{25mm}{15mm}{20mm}
+\newtheorem{hyp}{Hypothesis}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lem}{Lemma}
+
+\usepackage[official]{eurosym}
+\usepackage{times}
+
+% Macro enabling adding blank lines by inserting "\wl"
+\def\wl{\par \vspace{\baselineskip}}
+\def\changemargin#1#2{\list{}{\rightmargin#2\leftmargin#1}\item[]}
+\let\endchangemargin=\endlist
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+
+\title{Analysis of French emergency housing requests data}
+
+
+\date{\today}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\author{Alexis Bogroff\footnote{mail: {alexis.bogroff@gmail.com}}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+    This report is an enhanced and concise aggregation of the comments that can be found along the code, while presenting explanations on the decisions made. It also gives a quick overview of the project.
+
+\section{Project architecture}
+
+    The code is divded into:
+    \begin{itemize}
+        \item data\_exploration.ipyb: the main notebook file
+        \item cobratools.py: a module containing the classes and functions
+    \end{itemize}
+
+    The code files are attached in the mail of submission, but they can still be found in the following Github repository (not the data):\\
+    \href{https://github.com/AlexisBogroff/Contests/tree/master/Predictions/Emergency_housing}{github.com/AlexisBogroff/Contests/tree/master/Predictions/Emergency\_housing}\wl
+
+    The code is mainly based on the open-source python libraries:
+    \begin{itemize}
+        \item numpy
+        \item pandas
+        \item Pytorch
+    \end{itemize}
+
+
+\section{Data}
+
+    \subsection{Principal components}
+
+        Once applied the pre-processing describe later, the following extract of the correlation matrix from the train set present the most impactful variables with an absolute correlation above 4\% with the target variable:
+
+        \begin{table}[H]
+            \begin{tabular}{ll}
+            46.8   & district\_grant\_ratio                                                    \\
+            44.44  & town\_grant\_ratio                                                        \\
+            35.85  & housing\_situation\_label\_cat\_hotel paid by the emergency centre        \\
+            25.46  & housing\_situation\_label\_cat\_emergency structure                       \\
+            11.87  & group\_creation\_month                                                    \\
+            8.85   & group\_composition\_label\_cat\_single mother with child(ren)             \\
+            4.96   & housing\_situation\_label\_cat\_hotel paid by the regional administration \\
+            4.64   & victim\_of\_violence                                                      \\
+            -4.02  & group\_composition\_label\_cat\_group of adults                           \\
+            -4.38  & answer\_creation\_month                                                   \\
+            -4.43  & request\_creation\_month                                                  \\
+            -4.62  & group\_composition\_label\_cat\_couple without whildren                   \\
+            -4.64  & victim\_of\_violence\_type\_cat\_no violence                              \\
+            -4.84  & housing\_situation\_label\_cat\_mobile or makeshift shelter               \\
+            -6.09  & group\_composition\_label\_cat\_man alone                                 \\
+            -8.58  & housing\_situation\_label\_cat\_accomodation by a third party             \\
+            -8.64  & group\_creation\_year                                                     \\
+            -37.75 & housing\_situation\_label\_cat\_street                                   
+            \end{tabular}
+        \end{table}
+
+        Based on this table, any character of emergency, weakness and loneliness has a high positive impact on the target, while signs of supporting entourage and wealth impacts it negatively. Data is coherent with the goal of the institution.
+
+
+    \subsection{Pre-processing}
+
+        Methodology:
+        \begin{itemize}
+            \item Clean-up request dataframe
+            \item Feature engineer (partly using individuals dataset)
+        \end{itemize}
+
+
+        \subsubsection{Join data sets}
+            Since there are multiple requests by individuals and multiple individuals by request, the straightfoward approach would be to create columns for each individual' informations. This way, no information would be lost, but the curse of dimensionality is very near and the number of samples might be too low to extract useful information.\wl
+
+            The chosen approach is rather to only keep the request dataset' columns, and feature engineer additional columns based on the individuals data, eg.: number of past requests made by the same individual, number nights granted in past requests of the same individual(s)/group, gender diversity of the group, etc.\wl
+
+            However, for analytics purpose, a dataframe with all the data is also created.
+
+    
+        \subsubsection{NaNs imputation}
+            
+            Methodology:
+            
+            \begin{enumerate}
+                \item inspect NaNs on train set
+                \item if pattern detected, apply modifications on train and test sets
+            \end{enumerate}
+            
+            \textbf{group-composition-id}
+            \begin{itemize}
+                \item what to do: drop group-composition-label
+                \item why: the data seems to derive group-composition-id from group-composition-label, both would then necessary be redondant.
+            \end{itemize}
+
+
+            \textbf{child-to-come}
+            \begin{itemize}
+                \item what to do: impute child-to-come from the pregnancy in the individuals of the request
+                \item why: there are 145947 NaNs for child-to-come on the train set (in request), and only 14 NaNs for pregnancy in train set (in individuals). The former can thus be derived from the latter.
+            \end{itemize}
+                       
+
+            \textbf{housing-situation-label}
+            \begin{itemize}
+                \item what to do:
+                \begin{enumerate}
+                    \item impute housing-situation-label NaNs as 'street'
+                    \item drop housing-situation-id
+                    \item one-hot encode housing-situation-label
+                \end{enumerate}
+                \item why:
+                \begin{enumerate}
+                    \item ±90\% (21,185) of missing housing-situation-label are housing-situation-2-label "on the street"
+                    \item housing-situation-id is redondant with housing-situation-label
+                    \item it must be transform to a variable interpreted as categorical by the model, since if there is a logic in the numerical values of each class, it is not linear.
+                \end{enumerate}
+    
+            \end{itemize}
+
+
+            \textbf{long-term-housing-request}
+            \begin{itemize}
+                \item what to do: drop feature
+                \item why: it seems to have no direct impact on target
+            \end{itemize}            
+
+            \textbf{town}
+            \begin{itemize}
+                \item what to do: attribute the most probable town based on request district
+                \item why: it might be highly probable to ask for emergency housing where the individual live.
+            \end{itemize}            
+            
+
+            \textbf{victim-of-violence-type}
+            \begin{itemize}
+                \item what to do:
+                \begin{enumerate}
+                    \item Set a specific value to NaNs where victim-of-violence is 'f', which will later be transformed into a boolean
+                    \item Set another specific value to NaNs where victim-of-violence is 't'
+                \end{enumerate}
+                \item why: is NaN if victim-of-violence is 'f', and the grand majority of victim-of-violence-type NaNs comes from the absence of violence.
+            \end{itemize}
+            
+
+            \textbf{child-situation}
+            \begin{itemize}
+                \item what to do: replace child-situation by 10 when victim-of-violence-type 'child' Idem for 'family'
+                \item why: -1 (NaNs) for child-situation are mainly mapped with 10 when victim-of-violence-type 'child'
+            \end{itemize}
+            
+            \textbf{Remaining test set NaNs}
+            \begin{itemize}
+                \item what to do: impute with the first sample found in train set (yes it is bad ^^)
+                \item why: NaNs from test set that have no equivalent in train set can't be studied upfront
+                \item improve: allocating the average value from the same group of requests for the given variable
+            \end{itemize}
+        
+
+        \subsubsection{Outliers}
+
+            \textbf{Gender}
+            \begin{itemize}
+                \item what to do: set to female when individual is pregnant
+                \item why: only females are possibly pregnant
+            \end{itemize}
+        
+            \textbf{answer creation date}
+            \begin{itemize}
+                \item what to do: drop the whole feature
+                \item why: the variable is not available at prediction time
+            \end{itemize}
+
+            
+        \subsubsection{Dropped features}
+            
+            \begin{itemize}
+                \item Numerical columns dropped, mostly because it would require time to build larger categories based on there numeric values.
+                \begin{itemize}
+                    \item district (replaced by district-grant-ratio)
+                    \item town (replace by town-grant-ratio)
+                    \item group-id 
+                    \item group-main-requester-id
+                    \item request-backoffice-creator-id
+                    \item social-situation-id
+                \end{itemize}
+            \end{itemize}
+
+
+        \subsubsection{Delete samples}
+            It has not been applied, but to build a ready-for-production system, it should probably ignore old data, as the emergency housing centers evolve along with their selection criteria and capacity.
+            \begin{itemize}
+                \item Train/test split being done randomly (≠ historically), it is important for this competition to train the model on the whole train set (don't remove old samples).
+                \item Otherwise, delete samples with group-creation-date < 2015, since it is very unlikely that current demands are treated like +5 years ago (social services evolve)
+            \end{itemize}
+
+
+    \subsection{Feature engineering}
+
+        Transform current features:
+        \begin{itemize}
+            \item Transform dates into linear numerical features (year, month)
+            \item Transform categorical features (with less than 30 classes), into one-hot-encodings
+        \end{itemize}
+
+        Create new features:
+        \begin{itemize}
+            \item district-grant-ratio and town-grant-ratio:
+            \begin{itemize}
+                \item into numerical features linearly separable
+                \item obs: district-grant-ratio: has a large impact, with districts granting more nights than there are requests and some refusing way more often
+                \item hyp: sort of district emergency housing capacity measurement against the emergency housing demand
+            \end{itemize} 
+        \end{itemize}
+        
+
+\section{Model: construction, training and evaluation decisions}
+
+    \subsection{Architecture and parameters}
+
+        The retained model is a neural network composed of two hidden layers. It uses Rectified Linear Unit (ReLu) as internal activation functions, and passes its output logits directly to the weighted cross entropy criterion. A softmax is applied to obtain interpretable predictions. A detail information on the final hyper-parameters can be found directly in the section 'Predict' of the notebook.
+
+    \subsection{Evaluation}
+
+        I understand the choice of the weighted log-loss criterion as favoring the robustness and security of a model. It favors a model that is not accurate, to a model that yields wrong predictions with strong confidence.\\
+        It is however more difficult to reach a good accuracy by setting weights varying largely, and the behavior of the current model decreases accuracy in close relation to the reduction in loss.
+
+\section{Bias, interpretability}
+
+        The choice of a standard neural network is not optimal, and further methods to increase its interpretability should be used. Also, ensemble methods are recognized for their robustness and efficiency to a large variety of problems, hence futher developments would require their implementation. In regard with the split of train set into two parts to produce an evaluation set, the robustness of the predictions is increased, and reduce the out-of-sample variance.
+
+\section{Further improvements}
+    
+    Analysis
+    \begin{itemize}
+        \item explore requester-type data along with group-main-requester-id. If the agent is an urgentist, used to bring individuals to the service, its groups might have higher granted rates than random individuals coming on their own.
+        \item explore request-backoffice-creator-id data. It could impact the result since each people has its own biases (as for the predictions of court decisions). However it is named 'backoffice', and could imply that the person is not in position to impact the decision.
+    \end{itemize}
+    
+    Pre-processing:
+    \begin{itemize}
+        \item Imputations:
+        \begin{itemize}
+            \item Build more robust, generalisable imputations
+            \item Automate NaNs imputation for future test samples
+            \item Reconstruct some NaNs by training models to predict the missing feature
+            \item better impute child-situation (only a minority have been imputed properly)
+            \item Impute the 14 pregnancy NaNs from child-to-come
+            \item housing-situation-label: derive more sub-groups, and impute with its most often matched value
+        \end{itemize}
+        
+        \item Feature engineering, create new features:
+        \begin{itemize}
+            \item town-capacity-remaining: this can be computed on the month or the year. It could provide a guess of the number of nights that can be granted at time of request (using past request).
+            \item distance between town and district
+            \item transform town and district to regions
+            \item number of individuals in the group
+            \item number of past requests by individuals forming the group of the request
+            \item same feature for granted requests only
+            \item hot-cold season
+        \end{itemize}
+    \end{itemize}
+        
+    Code:
+    \begin{itemize}
+        \item Implementation to enable GPU
+        \item Refactor imputation of child-to-come NaNs (takes +3 min)
+    \end{itemize}
+
+    Model:
+    \begin{itemize}
+        \item prediction with confidence intervals
+        \item ensemble methods
+        \item methods to increase the interpretability of the neural network
+    \end{itemize}
+    
+    Approach:
+    \begin{itemize}
+        \item Add domain knowledge into the mix
+    \end{itemize}
+
+  
+\end{document}
