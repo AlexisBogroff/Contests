@@ -11,6 +11,13 @@
 - Compare with previous years (time series)
 
 
+# II. Build model to predict prix de vente (or Loyer)
+
+## Feature engineering
+- create feat 'Paris' (1 when Ville is Paris)
+- drop 'Ville'
+
+
 
 # III. Identifier les zones et types de biens intéressants pour de l'investissement locatif
 
