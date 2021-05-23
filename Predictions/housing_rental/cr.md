@@ -18,10 +18,15 @@
 - drop 'Ville'
 
 
+# Further
+- Build multiple models, with each being specialised in a market segment (high value good, small goods, Paris expert, etc.)
+
+- Since high values dropped (in superficie, chambres and pièces), a Tree regressor should not be good to extrapolate
+
 
 # III. Identifier les zones et types de biens intéressants pour de l'investissement locatif
 
-Quelle mesure définirait une opportunité intéressante ?
+Quelle mesure définirait une opportunité "intéressante" ?
 - si ratio Loyer / Prix de vente est élevé
 
 Secteur dynamique :
