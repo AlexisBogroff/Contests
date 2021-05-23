@@ -1,3 +1,17 @@
+
+# I. Analysis
+
+## Questions
+- more sells than rentals ? (Not good if buy where nothing is rented afterwards)
+- Varying distributions of Chambres and Pièces depending on Code Postal? (See with Paris map)
+
+
+# Further
+- Compare with data from other platforms (trends from Seloger might depend form the clients targeted by SeLoger, which are not necessarily representative of the whole IDF clients that sell and rent).
+- Compare with previous years (time series)
+
+
+
 # III. Identifier les zones et types de biens intéressants pour de l'investissement locatif
 
 Quelle mesure définirait une opportunité intéressante ?
