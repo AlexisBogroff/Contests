@@ -16,6 +16,11 @@
 ## Feature engineering
 - create feat 'Paris' (1 when Ville is Paris)
 - drop 'Ville'
+- return_area = (loyer_area * 12) / prix_de_vente_area
+- risk_area = n_announces_loyers_area / n_announces_vente_area
+- ratio = return_area / risk_area
+
+## Analysis
 
 
 # Further
