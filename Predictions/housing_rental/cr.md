@@ -20,6 +20,11 @@
 - risk_area = n_announces_loyers_area / n_announces_vente_area
 - ratio = return_area / risk_area
 
+## Model
+- Train RF on one-hot encoded Code Postal (or hashed)
+- Train the model on the whole dataset (train&test), even though it will not be possible to assess its score
+
+
 ## Analysis
 
 
@@ -43,3 +48,8 @@ Time series (pas dans la base) :
 - si prix d'un bien / quartier augmente au cours du temps
 - si prix d'un bien / quartier a baissé avec le covid. Hyp: remontera ensuite
 - si loyers augmentent au cours du temps
+
+## Méthodologie
+
+Risk measure:
+- si le loyer varie beaucoup pour une même surface, alors c'est plus risqué que si le prix est systématiquement le même pour cette même surface. Ne fonctionne pas car s'il y a trop peu de loyers dans une zone, son risque sera petit.
