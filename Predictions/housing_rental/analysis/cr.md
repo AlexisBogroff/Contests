@@ -26,6 +26,15 @@
 
 
 ## Analysis
+- Mesure de performance de modèle R2:
+On pourrait mesurer la performance du modèle en comptant le nombre de bonnes réponses si on faisait de la classification, c’est à dire si on prédisait si il s’agit d’un petit appartement (1) ou non (0).
+
+Puisqu’il s’agit d’un problème de régression, on ne peut pas le faire (car une prédiction d’un loyer à) 519€ au lieu du vrai prix 520€ serait considéré comme une mauvaise prédiction - alors qu’on souhaite dire que c’est une bonne prédiction).
+
+Ce que l’on peut faire c’est mesurer à quel point notre prédiction est éloignée de la valeur réelle. On appelle ça une “distance”. On mesure la distance entre notre prédiction et la vraie valeur.
+Une mesure de distance courante est la norme d’ordre 2. (Il s’agit juste de l’écart entre 2 points, mis au carré - pour de multiples raisons).
+
+R2 mesure les erreurs de prédiction avec la norm2. R2 mesure plus précisément la variance expliquée par le modèle. C’est à dire que les valeurs réelles varient, et on essaie de trouver des variables qui expliquent cette variance. R2 mesure à quel point nos variables permettent d’expliquer ces variations.
 
 
 # Further
